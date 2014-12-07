@@ -20,8 +20,10 @@ angular.module('App', ['ngRoute'])
                 redirectTo: '/'
             });
     }])
-    .controller('SheetListController', [function SheetListController() {/* 一覧用 */}])
-    .controller('CreationController', ['$scope', function CreationController($scope) {
+    .controller('SheetListController', ['$scope', 'sheets', function SheetListController($scope, sheets) {
+            $scope.list = sheets.list; // 帳票リストモデル
+        }])
+    .controller('CreationController', ['$scope', 'sheets', function CreationController($scope, $location, sheets) {
         // 新しい明細行を作成する
         function createOrderLine() {
             return {
@@ -30,7 +32,6 @@ angular.module('App', ['ngRoute'])
                 count: 0
             };
         }
-        $scope.lines = [createOrderLine()]; // 明細行リスト
 
         // リストモデルに新しい明細行を追加する
         $scope.addLine = function () {
@@ -43,7 +44,10 @@ angular.module('App', ['ngRoute'])
         };
 
         // リストモデルから帳票モデルを作成して保存
-        $scope.save = function () {};
+        $scope.save = function () {
+            sheets.add($scope.lines);
+            $location.path('/');
+        };
 
         // 任意の明細行をリストモデルから取り除く
         $scope.removeLine = function (target) {
@@ -70,6 +74,52 @@ angular.module('App', ['ngRoute'])
 
             return totalAmount;
         };
+
+        $scope.initialize();
     }])
-    .controller('SheetController', [function SheetController() {/* 詳細用 */}]);
+    .controller('SheetController', ['$scope', '$routeParams', 'sheets',
+        function SheetController($scope, $params, sheets) {
+            angular.extend($scope, sheets.get($params.id));
+
+            $scope.getSubtotal = function (orderLine) {
+                return orderLine.unitPrice * orderLine.count;
+            };
+
+            $scope.getTotalAmount = function (lines) {
+                var totalAmount = 0;
+
+                angular.forEach(lines, function (orderLine) {
+                    totalAmount += $scope.getSubtotal(orderLine);
+                });
+
+                return totalAmount;
+            };
+        }])
+    .service('sheets', [function () {
+        this.list = []; // 帳票リスト
+
+        // 明細行リストを受け取り新しい帳票を作成して帳票リストに加える
+        this.add = function (lines) {
+            this.list.push({
+                id: String(this.list.length + 1),
+                createdAt: Date.now(),
+                lines: lines
+            });
+        };
+
+        // 任意の id を持った帳票を返す
+        this.get = function (id) {
+            var list = this.list;
+            var index = list.length;
+            var sheet;
+
+            while (index--) {
+                sheet = list[index];
+                if (sheet.id === id) {
+                    return sheet;
+                }
+            }
+            return null;
+        };
+    }]);
 
